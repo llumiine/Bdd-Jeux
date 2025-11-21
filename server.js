@@ -15,7 +15,7 @@ let gamesCollection;
 let client;
 
 async function startDb() {
-  client = new MongoClient(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+  client = new MongoClient(MONGODB_URI);
   await client.connect();
   const db = client.db(DB_NAME);
   gamesCollection = db.collection(COLLECTION_NAME);
@@ -62,7 +62,6 @@ function toResp(doc) {
   return { id: _id.toString(), ...rest };
 }
 
-/* POST /api/games */
 app.post('/api/games', async (req, res) => {
   try {
     const payload = req.body;
@@ -92,7 +91,6 @@ app.post('/api/games', async (req, res) => {
   }
 });
 
-/* GET /api/games (liste + filtres) */
 app.get('/api/games', async (req, res) => {
   try {
     const { genre, plateforme, termine, favorite } = req.query;
@@ -112,7 +110,6 @@ app.get('/api/games', async (req, res) => {
   }
 });
 
-/* GET /api/games/:id */
 app.get('/api/games/:id', async (req, res) => {
   try {
     const id = req.params.id;
