@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Collection de jeux</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="container">
+    <h1>Ma collection de Jeux</h1>
+
+    <form id="gameForm" class="card">
+      <input id="id" type="hidden">
+      <div class="row">
+        <label>Titre<input id="titre" required></label>
+        <label>Genre <input id="genre" required></label>
+        <label>Plateforme <input id="plateforme" required></label>
+      </div>
+      <div class="row">
+        <label>Année <input id="annee" type="number"></label>
+        <label>Heures <input id="heures" type="number" min="0"></label>
+        <label class="checkbox"><input id="termine" type="checkbox"> Terminé</label>
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn primary">Enregistrer</button>
+        <button id="btnReset" type="button" class="btn">Réinitialiser</button>
+      </div>
+    </form>
+
+    <section class="controls">
+      <input id="fgenre" placeholder="Filtre genre">
+      <input id="fplat" placeholder="Filtre plateforme">
+      <button id="apply" class="btn">Filtrer</button>
+      <button id="export" class="btn">Exporter</button>
+    </section>
+
+    <table class="card">
+      <thead><tr><th>Titre</th><th>Genre</th><th>Plateforme</th><th>Année</th><th>H</th><th>Terminé</th><th>Fav</th><th>Actions</th></tr></thead>
+      <tbody id="list"></tbody>
+    </table>
+  </main>
+
+<script>
+(() => {
+  const api = '/api';
+  const form = document.getElementById('gameForm');
+  const list = document.getElementById('list');
+  const btnReset = document.getElementById('btnReset');
+
+  async function load(params = {}) {
+    const url = new URL(api + '/games', location.origin);
+    Object.entries(params).forEach(([k, v]) => v ? url.searchParams.append(k, v) : null);
+    const res = await fetch(url);
+    if (!res.ok) return alert('Erreur chargement');
+    const data = await res.json();
+    list.innerHTML = '';
+    data.forEach(g => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${g.titre || ''}</td>
+        <td>${(g.genre || []).join(', ')}</td>
+        <td>${(g.plateforme || []).join(', ')}</td>
+        <td>${g.annee_sortie || ''}</td>
+        <td>${g.temps_jeu_heures || 0}</td>
+        <td>${g.termine ? 'Oui' : 'Non'}</td>
+        <td>${g.favorite ? '★' : ''}</td>
+        <td>
+          <button data-id="${g.id}" class="edit">Edit</button>
+          <button data-id="${g.id}" class="sup">Sup</button>
+          <button data-id="${g.id}" class="fav">${g.favorite ? 'Retirer' : 'Fav'}</button>
+        </td>`;
+      list.appendChild(tr);
+    });
+  }
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const id = document.getElementById('id').value;
+    const payload = {
+      titre: document.getElementById('titre').value.trim(),
+      genre: document.getElementById('genre').value.split(',').map(s => s.trim()).filter(Boolean),
+      plateforme: document.getElementById('plateforme').value.split(',').map(s => s.trim()).filter(Boolean),
+      annee_sortie: Number(document.getElementById('annee').value) || null,
+      temps_jeu_heures: document.getElementById('heures').value ? Number(document.getElementById('heures').value) : 0,
+      termine: document.getElementById('termine').checked
+    };
+    const method = id ? 'PUT' : 'POST';
+    const url = api + '/games' + (id ? '/' + id : '');
+    const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      return alert('Erreur: ' + (err.errors || err.error || r.status));
+    }
+    form.reset();                
+    document.getElementById('id').value = '';
+    load();
+  });
+
+  btnReset.addEventListener('click', () => {
+    form.reset();
+    document.getElementById('id').value = '';
+  });
+
+  list.addEventListener('click', async e => {
+    const id = e.target.dataset.id;
+    if (!id) return;
+    if (e.target.classList.contains('edit')) {
+      const r = await fetch(api + '/games/' + id);
+      const g = await r.json();
+      document.getElementById('id').value = g.id;
+      document.getElementById('titre').value = g.titre || '';
+      document.getElementById('genre').value = (g.genre || []).join(',');
+      document.getElementById('plateforme').value = (g.plateforme || []).join(',');
+      document.getElementById('annee').value = g.annee_sortie || '';
+      document.getElementById('heures').value = g.temps_jeu_heures || 0;
+      document.getElementById('termine').checked = !!g.termine;
+    } else if (e.target.classList.contains('sup')) {
+      if (!confirm('Supprimer ?')) return;
+      await fetch(api + '/games/' + id, { method: 'DELETE' });
+      load();
+    } else if (e.target.classList.contains('fav')) {
+      await fetch(api + '/games/' + id + '/favorite', { method: 'POST' });
+      load();
+    }
+  });
+
+  document.getElementById('apply').addEventListener('click', () => {
+    load({
+      genre: document.getElementById('fgenre').value.trim() || undefined,
+      plateforme: document.getElementById('fplat').value.trim() || undefined
+    });
+  });
+
+  document.getElementById('export').addEventListener('click', () => location.href = '/api/games/export');
+
+  load();
+})();
+</script>
+</body>
+</html>
